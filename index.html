@@ -63,6 +63,11 @@ ul{list-style:none;margin:0;padding:0}
 .bar{flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--c);border-radius:3px}
 .last{font-size:13px;color:var(--muted);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sect{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 8px;display:flex;gap:8px}
+.sect span{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:600}
+.week{display:inline-flex;gap:3px;align-items:center}
+.week i{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--c)}
+.week i.on{background:var(--c)}
 .empty{color:var(--muted);text-align:center;padding:28px 12px}
 details.donelist{margin-top:14px}
 details.donelist summary{color:var(--muted);font-weight:600;cursor:pointer;margin-bottom:8px}
@@ -204,6 +209,14 @@ function remove(id) {
   state.items[id] = {id, deleted:true, updatedAt: Date.now()};
   save();
 }
+function doneOn(t, day) { return !!(t.doneDays && t.doneDays[day]); }
+function lastDays(n) { const out = []; for (let i = n - 1; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); out.push(ymd(d)); } return out; }
+function streak(t) {
+  const d = new Date(); let n = 0;
+  if (!doneOn(t, ymd(d))) d.setDate(d.getDate() - 1);
+  while (doneOn(t, ymd(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
 function shownProgress(t) { return t.status === 'done' ? 100 : t.progress; }
 function when(it) { return it.time ? new Date(`${it.date}T${it.time}`) : new Date(`${it.date}T23:59:59`); }
 function isOverdue(it) { return it.kind === 'task' && it.status !== 'done' && it.date && when(it) < new Date(); }
@@ -243,8 +256,22 @@ function taskCard(t) {
       ${last ? `<div class="last">${fmtStamp(last.at)}: ${esc(last.text)}</div>` : ''}
     </div></li>`;
 }
+function dailyCard(t) {
+  const c = CATS[t.cat] || CATS.personal, last = t.notes && t.notes[t.notes.length - 1], on = doneOn(t, today()), s = streak(t);
+  return `<li class="card ${on ? 'done' : ''}" style="--c:${c.color}" data-id="${t.id}">
+    <button class="check ${on ? 'on' : ''}" data-act="toggle" aria-label="${on ? 'Mark not done today' : 'Mark done today'}">${on ? '✓' : ''}</button>
+    <div class="cbody" data-act="open">
+      <div class="ctitle">${esc(t.title) || '<em>Untitled</em>'}</div>
+      <div class="meta"><span class="catname">${c.name}</span><span class="pill">Daily</span>
+        <span>${s ? s + '-day streak' : 'No streak yet'}</span>
+        <span class="week" title="Last 7 days">${lastDays(7).map(d => `<i class="${doneOn(t, d) ? 'on' : ''}"></i>`).join('')}</span></div>
+      ${last ? `<div class="last">${fmtStamp(last.at)}: ${esc(last.text)}</div>` : ''}
+    </div></li>`;
+}
 function renderTasks() {
-  const tasks = live().filter(i => i.kind === 'task');
+  const all = live().filter(i => i.kind === 'task');
+  const daily = all.filter(t => t.daily).sort((a, b) => doneOn(a, today()) - doneOn(b, today()) || a.createdAt - b.createdAt);
+  const tasks = all.filter(t => !t.daily);
   const byDue = (a, b) => (a.date || '9999') .localeCompare(b.date || '9999') || (a.time || '99').localeCompare(b.time || '99') || a.createdAt - b.createdAt;
   const open = tasks.filter(t => t.status !== 'done').sort(byDue);
   const done = tasks.filter(t => t.status === 'done').sort((a, b) => b.updatedAt - a.updatedAt);
@@ -252,9 +279,12 @@ function renderTasks() {
     <form class="panel quick" id="quick">
       <input type="text" id="qTitle" placeholder="Add a task…" aria-label="Task title" autocomplete="off">
       <select id="qCat" aria-label="Category">${catOptions(filter === 'all' ? 'personal' : filter)}</select>
+      <select id="qRepeat" aria-label="Repeats"><option value="once">One-time</option><option value="daily">Daily</option></select>
       <input type="date" id="qDate" aria-label="Deadline (optional)" title="Deadline (optional)">
       <button class="primary">Add</button>
     </form>
+    ${daily.length ? `<div class="sect">Daily<span>${daily.filter(t => doneOn(t, today())).length} of ${daily.length} done today</span></div>
+      <ul>${daily.map(dailyCard).join('')}</ul><div class="sect">Tasks</div>` : ''}
     ${open.length ? `<ul>${open.map(taskCard).join('')}</ul>` : `<div class="empty">No open tasks${filter === 'all' ? '' : ' in ' + CATS[filter].name}. Add one above.</div>`}
     ${done.length ? `<details class="donelist"><summary>Completed (${done.length})</summary><ul>${done.map(taskCard).join('')}</ul></details>` : ''}`;
 }
@@ -302,30 +332,32 @@ function renderCalendar() {
 /* ---------- editor ---------- */
 function openEditor(id) { editId = id; renderEditor(); $('#editor').showModal(); if (!state.items[id].title) $('#eTitle').focus(); }
 function renderEditor() {
-  const it = state.items[editId], isTask = it.kind === 'task';
-  $('#edTitle').textContent = isTask ? 'Task' : 'Date';
+  const it = state.items[editId], isTask = it.kind === 'task', daily = isTask && it.daily;
+  $('#edTitle').textContent = daily ? 'Daily task' : isTask ? 'Task' : 'Date';
   const opts = (map, sel) => Object.entries(map).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v}</option>`).join('');
   $('#edBody').innerHTML = `
     <label class="f">Title<input id="eTitle" value="${esc(it.title)}" placeholder="${isTask ? 'What needs doing?' : 'What is happening?'}" autocomplete="off"></label>
     <div class="row">
       <label class="f">Category<select id="eCat">${catOptions(it.cat)}</select></label>
-      ${isTask ? `<label class="f">Status<select id="eStatus">${opts(STATUS, it.status)}</select></label>` : ''}
+      ${isTask ? `<label class="f">Repeats<select id="eRepeat"><option value="once">One-time</option><option value="daily" ${daily ? 'selected' : ''}>Daily</option></select></label>` : ''}
+      ${isTask && !daily ? `<label class="f">Status<select id="eStatus">${opts(STATUS, it.status)}</select></label>` : ''}
     </div>
+    ${daily ? `<p class="help">Resets every day and has no deadline, so it stays off the calendar. Done on ${lastDays(30).filter(d => doneOn(it, d)).length} of the last 30 days; current streak ${streak(it)}.</p>` : `
     <div class="row">
       <label class="f">${isTask ? 'Deadline (optional)' : 'Date'}<input type="date" id="eDate" value="${esc(it.date)}"></label>
       <label class="f">Time (optional)<input type="time" id="eTime" value="${esc(it.time)}" ${it.date ? '' : 'disabled'}></label>
     </div>
-    <label class="f">Reminder<select id="eRemind" ${it.date ? '' : 'disabled'}>${opts(REMIND, it.remind)}</select></label>
+    <label class="f">Reminder<select id="eRemind" ${it.date ? '' : 'disabled'}>${opts(REMIND, it.remind)}</select></label>`}
     ${isTask ? `
-      <label class="f">Progress: ${shownProgress(it)}%<input type="range" id="eProg" min="0" max="100" step="5" value="${shownProgress(it)}"></label>
+      ${daily ? '' : `<label class="f">Progress: ${shownProgress(it)}%<input type="range" id="eProg" min="0" max="100" step="5" value="${shownProgress(it)}"></label>`}
       <div class="notes"><hr><h3>Progress notes</h3>
         <textarea id="nText" placeholder="What did you get done? What is next?"></textarea>
         <div class="addnote">
-          <label class="f" style="flex:0 1 150px">Progress now (%)<input type="number" id="nProg" min="0" max="100" step="5" value="${shownProgress(it)}"></label>
+          ${daily ? '' : `<label class="f" style="flex:0 1 150px">Progress now (%)<input type="number" id="nProg" min="0" max="100" step="5" value="${shownProgress(it)}"></label>`}
           <button class="primary" id="nAdd" type="button">Add note</button>
         </div>
         <div style="margin-top:10px">${it.notes.length ? it.notes.slice().reverse().map(n => `
-          <div class="note"><div class="nt"><div class="nm">${fmtStamp(n.at)}${n.from !== n.to ? ` · ${n.from}% → ${n.to}%` : ` · ${n.to}%`}</div>${esc(n.text)}</div>
+          <div class="note"><div class="nt"><div class="nm">${fmtStamp(n.at)}${n.to === undefined ? '' : n.from !== n.to ? ` · ${n.from}% → ${n.to}%` : ` · ${n.to}%`}</div>${esc(n.text)}</div>
           <button class="x" data-del-note="${n.id}" aria-label="Delete note">×</button></div>`).join('')
           : '<p class="help">No notes yet. Add one each time you make progress.</p>'}</div>
       </div>` : `<label class="f">Details<textarea id="eDetails">${esc(it.details)}</textarea></label>`}`;
@@ -344,6 +376,7 @@ $('#edBody').addEventListener('change', e => {
   if (t.id === 'eTitle') patch = {title: t.value.trim()};
   else if (t.id === 'eCat') patch = {cat: t.value};
   else if (t.id === 'eStatus') patch = {status: t.value};
+  else if (t.id === 'eRepeat') patch = t.value === 'daily' ? {daily:true, date:'', time:''} : {daily:false};
   else if (t.id === 'eDate') {
     if (!t.value && it.kind === 'date') { t.value = it.date; return; }
     patch = t.value ? {date: t.value} : {date:'', time:''};
@@ -354,7 +387,7 @@ $('#edBody').addEventListener('change', e => {
   else if (t.id === 'eProg') patch = progressPatch(it, +t.value);
   if (!patch) return;
   update(editId, patch);
-  if (['eStatus', 'eDate', 'eProg'].includes(t.id)) renderEditor();
+  if (['eStatus', 'eDate', 'eProg', 'eRepeat'].includes(t.id)) renderEditor();
 });
 $('#edBody').addEventListener('click', e => {
   const it = state.items[editId];
@@ -362,9 +395,12 @@ $('#edBody').addEventListener('click', e => {
   if (e.target.id === 'nAdd') {
     const text = $('#nText').value.trim();
     if (!text) { $('#nText').focus(); return; }
-    const from = shownProgress(it), patch = progressPatch(it, +$('#nProg').value);
     const title = $('#eTitle').value.trim();
-    update(editId, Object.assign(patch, {title, notes: it.notes.concat({id: uid(), at: Date.now(), text, from, to: patch.progress})}));
+    if (it.daily) update(editId, {title, notes: it.notes.concat({id: uid(), at: Date.now(), text})});
+    else {
+      const from = shownProgress(it), patch = progressPatch(it, +$('#nProg').value);
+      update(editId, Object.assign(patch, {title, notes: it.notes.concat({id: uid(), at: Date.now(), text, from, to: patch.progress})}));
+    }
     renderEditor();
   }
   const del = e.target.dataset.delNote;
@@ -392,7 +428,8 @@ $('#main').addEventListener('submit', e => {
   e.preventDefault();
   const title = $('#qTitle').value.trim();
   if (!title) return;
-  create('task', {title, cat: $('#qCat').value, date: $('#qDate').value});
+  const daily = $('#qRepeat').value === 'daily';
+  create('task', {title, cat: $('#qCat').value, daily, date: daily ? '' : $('#qDate').value});
   $('#qTitle').focus();
 });
 $('#main').addEventListener('click', e => {
@@ -400,7 +437,12 @@ $('#main').addEventListener('click', e => {
   const card = t.closest('.card');
   if (card) {
     const it = state.items[card.dataset.id];
-    if (t.closest('[data-act=toggle]')) update(it.id, {status: it.status === 'done' ? (it.progress > 0 ? 'doing' : 'todo') : 'done'});
+    if (t.closest('[data-act=toggle]') && it.daily) {
+      const days = Object.assign({}, it.doneDays);
+      if (days[today()]) delete days[today()]; else days[today()] = 1;
+      update(it.id, {doneDays: days});
+    }
+    else if (t.closest('[data-act=toggle]')) update(it.id, {status: it.status === 'done' ? (it.progress > 0 ? 'doing' : 'todo') : 'done'});
     else if (t.closest('[data-act=open]')) openEditor(it.id);
     return;
   }
