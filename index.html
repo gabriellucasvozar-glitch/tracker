@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tracker">
+<meta name="theme-color" content="#111827">
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#fff; --text:#16181d; --muted:#667085; --line:#e4e7ec; --accent:#16181d; --accent-text:#fff;
+  --danger:#d92d20; --radius:12px;
+  --self:#8b5cf6; --career:#0ea5e9; --school:#f59e0b; --personal:#10b981;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0f1115; --panel:#181b21; --text:#eceef2; --muted:#98a2b3; --line:#2a2f38; --accent:#eceef2; --accent-text:#0f1115; --danger:#f97066}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:0 16px calc(24px + env(safe-area-inset-bottom))}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.wrap{max-width:980px;margin:0 auto}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:calc(14px + env(safe-area-inset-top)) 0 12px}
+h1{font-size:20px;margin:0;letter-spacing:-.01em}
+.tabs{display:flex;background:var(--line);border-radius:10px;padding:3px;margin-left:auto}
+.tabs button{border:0;background:none;padding:6px 16px;border-radius:8px;font-weight:600;color:var(--muted)}
+.tabs button[aria-selected=true]{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.ghost{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:6px 11px}
+.ghost:hover{border-color:var(--muted)}
+#syncBtn{font-size:13px;color:var(--muted)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600}
+.chip i{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.chip[aria-pressed=true]{border-color:var(--c,var(--text));box-shadow:inset 0 0 0 1px var(--c,var(--text))}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
+.quick{display:flex;gap:8px;padding:10px;margin-bottom:14px;flex-wrap:wrap}
+.quick input[type=text]{flex:1 1 220px}
+input,select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-width:0}
+textarea{width:100%;resize:vertical;min-height:64px}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--career);outline-offset:1px}
+.primary{background:var(--accent);color:var(--accent-text);border:0;border-radius:9px;padding:8px 16px;font-weight:600}
+.danger{color:var(--danger)}
+ul{list-style:none;margin:0;padding:0}
+.card{display:flex;gap:12px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--c);
+  border-radius:var(--radius);padding:12px 14px;margin-bottom:8px}
+.check{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--c);background:none;margin-top:1px;padding:0;color:#fff;font-size:13px;line-height:1}
+.check.on{background:var(--c)}
+.cbody{flex:1;min-width:0;cursor:pointer}
+.ctitle{font-weight:600;overflow-wrap:anywhere}
+.done .ctitle{text-decoration:line-through;color:var(--muted)}
+.meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted);margin-top:3px}
+.catname{color:var(--c);font-weight:700;filter:saturate(1.1) brightness(.85)}
+@media (prefers-color-scheme:dark){.catname{filter:none}}
+.pill{border:1px solid var(--line);border-radius:999px;padding:0 8px}
+.overdue{color:var(--danger);font-weight:600}
+.prog{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--muted)}
+.bar{flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--c);border-radius:3px}
+.last{font-size:13px;color:var(--muted);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{color:var(--muted);text-align:center;padding:28px 12px}
+details.donelist{margin-top:14px}
+details.donelist summary{color:var(--muted);font-weight:600;cursor:pointer;margin-bottom:8px}
+/* calendar */
+.calhead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.calhead h2{font-size:18px;margin:0 auto 0 0}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--line);gap:1px}
+.dow{background:var(--panel);text-align:center;font-size:11.5px;font-weight:700;color:var(--muted);padding:6px 0;text-transform:uppercase;letter-spacing:.04em}
+.day{background:var(--panel);min-height:96px;padding:5px;border:0;text-align:left;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.day.other{background:var(--bg)}
+.day.other .num{opacity:.45}
+.day.sel{box-shadow:inset 0 0 0 2px var(--text)}
+.num{font-size:12.5px;font-weight:600;width:22px;height:22px;display:grid;place-items:center;border-radius:50%}
+.today .num{background:var(--text);color:var(--bg)}
+.ev{font-size:11.5px;line-height:1.35;border-radius:5px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:color-mix(in srgb,var(--c) 20%,var(--panel));border-left:3px solid var(--c)}
+.ev.isdone{text-decoration:line-through;opacity:.6}
+.more{font-size:11px;color:var(--muted)}
+.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
+.box{padding:14px}
+.box h3{margin:0 0 10px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.box h3 span{margin-right:auto}
+.rowitem{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
+.rowitem .dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--c)}
+.rowitem .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rowitem .w{font-size:12.5px;color:var(--muted);flex:none}
+.kind{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:0 7px;color:var(--muted);flex:none}
+@media (max-width:640px){
+  .day{min-height:58px;align-items:center;padding:4px 2px}
+  .evs{display:flex;flex-wrap:wrap;gap:3px;justify-content:center}
+  .ev{width:7px;height:7px;padding:0;border:0;border-radius:50%;background:var(--c);font-size:0}
+  .more{display:none}
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .tabs{margin-left:0;order:3;width:100%}
+  .tabs button{flex:1}
+  header h1{margin-right:auto}
+}
+@media (min-width:641px){.evs{display:flex;flex-direction:column;gap:3px;width:100%}}
+/* dialogs */
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--text);padding:0;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 24px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dhead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
+.dhead h2{font-size:16px;margin:0 auto 0 0}
+.dbody{padding:16px;display:flex;flex-direction:column;gap:12px}
+.f{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.row .f{flex:1 1 140px}
+.f input,.f select,.f textarea{font-size:15px;font-weight:400;color:var(--text)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.notes h3{font-size:14px;margin:6px 0}
+.addnote{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px}
+.note{border-top:1px solid var(--line);padding:9px 0;display:flex;gap:10px}
+.note .nt{flex:1;white-space:pre-wrap;overflow-wrap:anywhere}
+.note .nm{font-size:12px;color:var(--muted);margin-bottom:2px}
+.x{border:0;background:none;color:var(--muted);padding:2px 6px;font-size:16px}
+.help{font-size:13px;color:var(--muted);margin:0}
+.help a{color:inherit}
+.feed{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
+.feed i{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
+.feed span{margin-right:auto}
+.feed a{color:inherit}
+hr{border:0;border-top:1px solid var(--line);width:100%;margin:4px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Tracker</h1>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-view="tasks" aria-selected="true">Tasks</button>
+      <button role="tab" data-view="calendar" aria-selected="false">Calendar</button>
+    </div>
+    <button class="ghost" id="syncBtn" title="Sync and reminder settings">Local only</button>
+  </header>
+  <div class="filters" id="filters"></div>
+  <main id="main"></main>
+</div>
+
+<dialog id="editor">
+  <div class="dhead"><h2 id="edTitle">Task</h2>
+    <button class="ghost danger" id="edDelete">Delete</button>
+    <button class="primary" id="edClose">Done</button></div>
+  <div class="dbody" id="edBody"></div>
+</dialog>
+
+<dialog id="settings">
+  <div class="dhead"><h2>Sync and reminders</h2><button class="primary" id="setClose">Done</button></div>
+  <div class="dbody" id="setBody"></div>
+</dialog>
+
+<script>
+'use strict';
+const CATS = {
+  self:     {name:'Self-Development', color:'#8b5cf6'},
+  career:   {name:'Career',           color:'#0ea5e9'},
+  school:   {name:'School',           color:'#f59e0b'},
+  personal: {name:'Personal',         color:'#10b981'}
+};
+const STATUS = {todo:'Not started', doing:'In progress', done:'Done'};
+const REMIND = {none:'No reminder', at:'At the time (9 AM if no time set)', '10m':'10 minutes before', '1h':'1 hour before',
+                '1d':'1 day before', '3d':'3 days before', '1w':'1 week before'};
+const REMIND_MS = {at:0, '10m':6e5, '1h':36e5, '1d':864e5, '3d':2592e5, '1w':6048e5};
+const LS = 'tracker.v1', LS_CFG = 'tracker.sync', LS_SEEN = 'tracker.notified';
+const DATA_FILE = 'tracker-data.json';
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = () => ymd(new Date());
+const readJSON = (k, fallback) => { try { return JSON.parse(localStorage.getItem(k)) || fallback; } catch { return fallback; } };
+
+let state = readJSON(LS, {items:{}});
+if (!state.items) state = {items:{}};
+let cfg = readJSON(LS_CFG, {});
+let view = 'tasks', filter = 'all', editId = null;
+let calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1), selDay = today();
+
+/* ---------- data ---------- */
+function persist() { localStorage.setItem(LS, JSON.stringify(state)); }
+function save() { persist(); render(); scheduleSync(); }
+function live() {
+  return Object.values(state.items).filter(i => !i.deleted && (filter === 'all' || i.cat === filter));
+}
+function create(kind, fields) {
+  const now = Date.now(), id = uid();
+  state.items[id] = Object.assign({id, kind, title:'', cat: filter === 'all' ? 'personal' : filter, status:'todo', progress:0,
+    date:'', time:'', remind:'1d', details:'', notes:[], createdAt:now, updatedAt:now}, fields);
+  save();
+  return id;
+}
+function update(id, patch) {
+  const it = state.items[id];
+  if (!it) return;
+  Object.assign(it, patch, {updatedAt: Date.now()});
+  save();
+}
+function remove(id) {
+  state.items[id] = {id, deleted:true, updatedAt: Date.now()};
+  save();
+}
+function shownProgress(t) { return t.status === 'done' ? 100 : t.progress; }
+function when(it) { return it.time ? new Date(`${it.date}T${it.time}`) : new Date(`${it.date}T23:59:59`); }
+function isOverdue(it) { return it.kind === 'task' && it.status !== 'done' && it.date && when(it) < new Date(); }
+
+/* ---------- formatting ---------- */
+function fmtDate(s) {
+  const d = new Date(s + 'T00:00'), o = {weekday:'short', month:'short', day:'numeric'};
+  if (d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric';
+  return d.toLocaleDateString(undefined, o);
+}
+function fmtTime(t) { return new Date(`2000-01-01T${t}`).toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'}); }
+function fmtWhen(it) { return fmtDate(it.date) + (it.time ? ', ' + fmtTime(it.time) : ''); }
+function fmtStamp(ms) { return new Date(ms).toLocaleString(undefined, {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}); }
+
+/* ---------- rendering ---------- */
+function render() {
+  $('#filters').innerHTML =
+    `<button class="chip" data-cat="all" aria-pressed="${filter === 'all'}">All</button>` +
+    Object.entries(CATS).map(([k, c]) =>
+      `<button class="chip" data-cat="${k}" style="--c:${c.color}" aria-pressed="${filter === k}"><i></i>${c.name}</button>`).join('');
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view));
+  if (view === 'tasks') renderTasks(); else renderCalendar();
+}
+function catOptions(sel) {
+  return Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${c.name}</option>`).join('');
+}
+function taskCard(t) {
+  const c = CATS[t.cat] || CATS.personal, last = t.notes && t.notes[t.notes.length - 1], p = shownProgress(t);
+  return `<li class="card ${t.status === 'done' ? 'done' : ''}" style="--c:${c.color}" data-id="${t.id}">
+    <button class="check ${t.status === 'done' ? 'on' : ''}" data-act="toggle" aria-label="${t.status === 'done' ? 'Mark not done' : 'Mark done'}">${t.status === 'done' ? '✓' : ''}</button>
+    <div class="cbody" data-act="open">
+      <div class="ctitle">${esc(t.title) || '<em>Untitled</em>'}</div>
+      <div class="meta"><span class="catname">${c.name}</span><span class="pill">${STATUS[t.status]}</span>
+        ${t.date ? `<span class="${isOverdue(t) ? 'overdue' : ''}">${isOverdue(t) ? 'Overdue: ' : 'Due '}${fmtWhen(t)}</span>` : '<span>No deadline</span>'}
+        <span>${t.notes.length} note${t.notes.length === 1 ? '' : 's'}</span></div>
+      <div class="prog"><div class="bar"><i style="width:${p}%"></i></div>${p}%</div>
+      ${last ? `<div class="last">${fmtStamp(last.at)}: ${esc(last.text)}</div>` : ''}
+    </div></li>`;
+}
+function renderTasks() {
+  const tasks = live().filter(i => i.kind === 'task');
+  const byDue = (a, b) => (a.date || '9999') .localeCompare(b.date || '9999') || (a.time || '99').localeCompare(b.time || '99') || a.createdAt - b.createdAt;
+  const open = tasks.filter(t => t.status !== 'done').sort(byDue);
+  const done = tasks.filter(t => t.status === 'done').sort((a, b) => b.updatedAt - a.updatedAt);
+  $('#main').innerHTML = `
+    <form class="panel quick" id="quick">
+      <input type="text" id="qTitle" placeholder="Add a task…" aria-label="Task title" autocomplete="off">
+      <select id="qCat" aria-label="Category">${catOptions(filter === 'all' ? 'personal' : filter)}</select>
+      <input type="date" id="qDate" aria-label="Deadline (optional)" title="Deadline (optional)">
+      <button class="primary">Add</button>
+    </form>
+    ${open.length ? `<ul>${open.map(taskCard).join('')}</ul>` : `<div class="empty">No open tasks${filter === 'all' ? '' : ' in ' + CATS[filter].name}. Add one above.</div>`}
+    ${done.length ? `<details class="donelist"><summary>Completed (${done.length})</summary><ul>${done.map(taskCard).join('')}</ul></details>` : ''}`;
+}
+function dated() { return live().filter(i => i.date); }
+function rowItem(it, showDate) {
+  const c = CATS[it.cat] || CATS.personal;
+  return `<div class="rowitem" data-id="${it.id}" style="--c:${c.color}"><span class="dot"></span>
+    <span class="t" style="${it.status === 'done' && it.kind === 'task' ? 'text-decoration:line-through;opacity:.6' : ''}">${esc(it.title) || 'Untitled'}</span>
+    <span class="kind">${it.kind === 'task' ? 'Deadline' : 'Date'}</span>
+    <span class="w">${showDate ? fmtWhen(it) : (it.time ? fmtTime(it.time) : 'All day')}</span></div>`;
+}
+function renderCalendar() {
+  const byDay = {};
+  for (const it of dated()) (byDay[it.date] = byDay[it.date] || []).push(it);
+  const sortDay = (a, b) => (a.time || '').localeCompare(b.time || '') || a.createdAt - b.createdAt;
+  const start = new Date(calMonth); start.setDate(1 - start.getDay());
+  let cells = '';
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const key = ymd(d), list = (byDay[key] || []).sort(sortDay);
+    cells += `<button class="day ${d.getMonth() !== calMonth.getMonth() ? 'other' : ''} ${key === today() ? 'today' : ''} ${key === selDay ? 'sel' : ''}"
+      data-day="${key}" aria-label="${fmtDate(key)}, ${list.length} item${list.length === 1 ? '' : 's'}">
+      <span class="num">${d.getDate()}</span><span class="evs">${list.slice(0, 3).map(it =>
+        `<span class="ev ${it.kind === 'task' && it.status === 'done' ? 'isdone' : ''}" style="--c:${(CATS[it.cat] || CATS.personal).color}">${esc(it.title) || 'Untitled'}</span>`).join('')}
+      ${list.length > 3 ? `<span class="more">+${list.length - 3} more</span>` : ''}</span></button>`;
+  }
+  const dayList = (byDay[selDay] || []).sort(sortDay);
+  const upcoming = dated().filter(i => i.date >= today() && !(i.kind === 'task' && i.status === 'done'))
+    .sort((a, b) => a.date.localeCompare(b.date) || sortDay(a, b)).slice(0, 8);
+  $('#main').innerHTML = `
+    <div class="calhead"><h2>${calMonth.toLocaleDateString(undefined, {month:'long', year:'numeric'})}</h2>
+      <button class="ghost" data-nav="-1" aria-label="Previous month">‹</button>
+      <button class="ghost" data-nav="0">Today</button>
+      <button class="ghost" data-nav="1" aria-label="Next month">›</button></div>
+    <div class="grid">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div>
+    <div class="cols">
+      <div class="panel box"><h3><span>${fmtDate(selDay)}</span>
+        <button class="ghost" data-new="date">+ Date</button><button class="ghost" data-new="task">+ Task deadline</button></h3>
+        ${dayList.length ? dayList.map(i => rowItem(i, false)).join('') : '<p class="help">Nothing on this day.</p>'}</div>
+      <div class="panel box"><h3><span>Upcoming</span></h3>
+        ${upcoming.length ? upcoming.map(i => rowItem(i, true)).join('') : '<p class="help">No upcoming deadlines or dates.</p>'}</div>
+    </div>`;
+}
+
+/* ---------- editor ---------- */
+function openEditor(id) { editId = id; renderEditor(); $('#editor').showModal(); if (!state.items[id].title) $('#eTitle').focus(); }
+function renderEditor() {
+  const it = state.items[editId], isTask = it.kind === 'task';
+  $('#edTitle').textContent = isTask ? 'Task' : 'Date';
+  const opts = (map, sel) => Object.entries(map).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v}</option>`).join('');
+  $('#edBody').innerHTML = `
+    <label class="f">Title<input id="eTitle" value="${esc(it.title)}" placeholder="${isTask ? 'What needs doing?' : 'What is happening?'}" autocomplete="off"></label>
+    <div class="row">
+      <label class="f">Category<select id="eCat">${catOptions(it.cat)}</select></label>
+      ${isTask ? `<label class="f">Status<select id="eStatus">${opts(STATUS, it.status)}</select></label>` : ''}
+    </div>
+    <div class="row">
+      <label class="f">${isTask ? 'Deadline (optional)' : 'Date'}<input type="date" id="eDate" value="${esc(it.date)}"></label>
+      <label class="f">Time (optional)<input type="time" id="eTime" value="${esc(it.time)}" ${it.date ? '' : 'disabled'}></label>
+    </div>
+    <label class="f">Reminder<select id="eRemind" ${it.date ? '' : 'disabled'}>${opts(REMIND, it.remind)}</select></label>
+    ${isTask ? `
+      <label class="f">Progress: ${shownProgress(it)}%<input type="range" id="eProg" min="0" max="100" step="5" value="${shownProgress(it)}"></label>
+      <div class="notes"><hr><h3>Progress notes</h3>
+        <textarea id="nText" placeholder="What did you get done? What is next?"></textarea>
+        <div class="addnote">
+          <label class="f" style="flex:0 1 150px">Progress now (%)<input type="number" id="nProg" min="0" max="100" step="5" value="${shownProgress(it)}"></label>
+          <button class="primary" id="nAdd" type="button">Add note</button>
+        </div>
+        <div style="margin-top:10px">${it.notes.length ? it.notes.slice().reverse().map(n => `
+          <div class="note"><div class="nt"><div class="nm">${fmtStamp(n.at)}${n.from !== n.to ? ` · ${n.from}% → ${n.to}%` : ` · ${n.to}%`}</div>${esc(n.text)}</div>
+          <button class="x" data-del-note="${n.id}" aria-label="Delete note">×</button></div>`).join('')
+          : '<p class="help">No notes yet. Add one each time you make progress.</p>'}</div>
+      </div>` : `<label class="f">Details<textarea id="eDetails">${esc(it.details)}</textarea></label>`}`;
+}
+function progressPatch(it, p) {
+  p = Math.max(0, Math.min(100, Math.round(p) || 0));
+  const patch = {progress: p};
+  if (p === 100) patch.status = 'done';
+  else if (it.status === 'done' || (p > 0 && it.status === 'todo')) patch.status = 'doing';
+  return patch;
+}
+$('#edBody').addEventListener('change', e => {
+  const it = state.items[editId], t = e.target;
+  if (!it) return;
+  let patch = null;
+  if (t.id === 'eTitle') patch = {title: t.value.trim()};
+  else if (t.id === 'eCat') patch = {cat: t.value};
+  else if (t.id === 'eStatus') patch = {status: t.value};
+  else if (t.id === 'eDate') {
+    if (!t.value && it.kind === 'date') { t.value = it.date; return; }
+    patch = t.value ? {date: t.value} : {date:'', time:''};
+  }
+  else if (t.id === 'eTime') patch = {time: t.value};
+  else if (t.id === 'eRemind') patch = {remind: t.value};
+  else if (t.id === 'eDetails') patch = {details: t.value};
+  else if (t.id === 'eProg') patch = progressPatch(it, +t.value);
+  if (!patch) return;
+  update(editId, patch);
+  if (['eStatus', 'eDate', 'eProg'].includes(t.id)) renderEditor();
+});
+$('#edBody').addEventListener('click', e => {
+  const it = state.items[editId];
+  if (!it) return;
+  if (e.target.id === 'nAdd') {
+    const text = $('#nText').value.trim();
+    if (!text) { $('#nText').focus(); return; }
+    const from = shownProgress(it), patch = progressPatch(it, +$('#nProg').value);
+    const title = $('#eTitle').value.trim();
+    update(editId, Object.assign(patch, {title, notes: it.notes.concat({id: uid(), at: Date.now(), text, from, to: patch.progress})}));
+    renderEditor();
+  }
+  const del = e.target.dataset.delNote;
+  if (del && confirm('Delete this note?')) { update(editId, {notes: it.notes.filter(n => n.id !== del)}); renderEditor(); }
+});
+$('#edClose').onclick = () => $('#editor').close();
+$('#edDelete').onclick = () => {
+  const it = state.items[editId];
+  if (it && (!it.title || confirm(`Delete "${it.title}"?`))) { remove(editId); editId = null; $('#editor').close(); }
+};
+$('#editor').addEventListener('close', () => {
+  const it = editId && state.items[editId];
+  if (it && !it.deleted) {
+    const title = $('#eTitle') ? $('#eTitle').value.trim() : it.title;
+    if (!title) remove(editId);
+    else if (title !== it.title) update(editId, {title});
+  }
+  editId = null;
+});
+
+/* ---------- page events ---------- */
+document.querySelector('.tabs').addEventListener('click', e => { if (e.target.dataset.view) { view = e.target.dataset.view; render(); } });
+$('#filters').addEventListener('click', e => { const b = e.target.closest('[data-cat]'); if (b) { filter = b.dataset.cat; render(); } });
+$('#main').addEventListener('submit', e => {
+  e.preventDefault();
+  const title = $('#qTitle').value.trim();
+  if (!title) return;
+  create('task', {title, cat: $('#qCat').value, date: $('#qDate').value});
+  $('#qTitle').focus();
+});
+$('#main').addEventListener('click', e => {
+  const t = e.target;
+  const card = t.closest('.card');
+  if (card) {
+    const it = state.items[card.dataset.id];
+    if (t.closest('[data-act=toggle]')) update(it.id, {status: it.status === 'done' ? (it.progress > 0 ? 'doing' : 'todo') : 'done'});
+    else if (t.closest('[data-act=open]')) openEditor(it.id);
+    return;
+  }
+  const row = t.closest('.rowitem');
+  if (row) return openEditor(row.dataset.id);
+  const day = t.closest('[data-day]');
+  if (day) { selDay = day.dataset.day; return render(); }
+  if (t.dataset.nav !== undefined) {
+    const n = +t.dataset.nav;
+    if (n === 0) { const d = new Date(); calMonth = new Date(d.getFullYear(), d.getMonth(), 1); selDay = today(); }
+    else calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + n, 1);
+    return render();
+  }
+  if (t.dataset.new) openEditor(create(t.dataset.new, {date: selDay}));
+});
+
+/* ---------- calendar feeds (.ics) ---------- */
+const icsEsc = s => String(s).replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/([,;])/g, '\\$1');
+const fold = l => { const out = []; while (l.length > 73) { out.push(l.slice(0, 73)); l = ' ' + l.slice(73); } out.push(l); return out.join('\r\n'); };
+const utcStamp = ms => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+const localStamp = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+const TRIGGER_TIMED = {at:'PT0S', '10m':'-PT10M', '1h':'-PT1H', '1d':'-P1D', '3d':'-P3D', '1w':'-P7D'};
+const TRIGGER_ALLDAY = {at:'PT9H', '10m':'PT9H', '1h':'PT9H', '1d':'-PT15H', '3d':'-P2DT15H', '1w':'-P6DT15H'};
+function buildICS(cat) {
+  const name = cat ? 'Tracker: ' + CATS[cat].name : 'Tracker: All';
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Tracker//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'X-WR-CALNAME:' + icsEsc(name), 'REFRESH-INTERVAL;VALUE=DURATION:PT15M', 'X-PUBLISHED-TTL:PT15M'];
+  if (cat) L.push('X-APPLE-CALENDAR-COLOR:' + CATS[cat].color);
+  const items = Object.values(state.items).filter(i => !i.deleted && i.date && i.title && (!cat || i.cat === cat))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  for (const it of items) {
+    const isTask = it.kind === 'task', done = isTask && it.status === 'done', cname = (CATS[it.cat] || CATS.personal).name;
+    let summary = (done ? '✓ ' : isTask ? 'Due: ' : '') + it.title;
+    if (!cat) summary = `[${cname}] ${summary}`;
+    const last = isTask && it.notes[it.notes.length - 1];
+    const desc = isTask ? `${STATUS[it.status]}, ${shownProgress(it)}% complete` + (last ? `\nLatest note: ${last.text}` : '') : (it.details || '');
+    L.push('BEGIN:VEVENT', `UID:${it.id}@tracker`, 'DTSTAMP:' + utcStamp(it.updatedAt));
+    if (it.time) {
+      const s = new Date(`${it.date}T${it.time}`);
+      L.push('DTSTART:' + localStamp(s), 'DTEND:' + localStamp(new Date(s.getTime() + 18e5)));
+    } else {
+      const s = new Date(it.date + 'T00:00'), n = new Date(s); n.setDate(n.getDate() + 1);
+      L.push('DTSTART;VALUE=DATE:' + it.date.replace(/-/g, ''), 'DTEND;VALUE=DATE:' + ymd(n).replace(/-/g, ''));
+    }
+    L.push('SUMMARY:' + icsEsc(summary), 'CATEGORIES:' + icsEsc(cname));
+    if (desc) L.push('DESCRIPTION:' + icsEsc(desc));
+    if (!done && it.remind && it.remind !== 'none')
+      L.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEsc(summary),
+        'TRIGGER:' + (it.time ? TRIGGER_TIMED : TRIGGER_ALLDAY)[it.remind], 'END:VALARM');
+    L.push('END:VEVENT');
+  }
+  L.push('END:VCALENDAR');
+  return L.map(fold).join('\r\n') + '\r\n';
+}
+const FEEDS = [['', 'tracker-all.ics', 'All categories']].concat(Object.entries(CATS).map(([k, c]) => [k, `tracker-${k}.ics`, c.name]));
+
+/* ---------- sync (private GitHub gist) ---------- */
+let syncing = false, syncAgain = false, syncTimer = null;
+function saveCfg() { localStorage.setItem(LS_CFG, JSON.stringify(cfg)); }
+function setStatus(s) { $('#syncBtn').textContent = s; }
+async function api(path, opts = {}) {
+  const res = await fetch('https://api.github.com' + path, Object.assign({}, opts, {
+    headers: {Authorization: 'Bearer ' + cfg.token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
+  }));
+  if (!res.ok) { const err = new Error('GitHub ' + res.status); err.status = res.status; throw err; }
+  return res.json();
+}
+function filesPayload() {
+  const files = {[DATA_FILE]: {content: JSON.stringify(state)}};
+  for (const [cat, file] of FEEDS) files[file] = {content: buildICS(cat)};
+  return files;
+}
+async function findOrCreateGist() {
+  const list = await api('/gists?per_page=100');
+  let g = list.find(x => x.files && x.files[DATA_FILE]);
+  if (!g) g = await api('/gists', {method:'POST', body: JSON.stringify({description:'Tracker data and calendar feeds', public:false, files: filesPayload()})});
+  cfg.gistId = g.id; cfg.login = g.owner.login; saveCfg();
+}
+function scheduleSync() { if (cfg.token) { clearTimeout(syncTimer); syncTimer = setTimeout(sync, 1500); } }
+async function sync() {
+  if (!cfg.token) return setStatus('Local only');
+  if (syncing) { syncAgain = true; return; }
+  syncing = true; setStatus('Syncing…');
+  try {
+    if (!cfg.gistId) await findOrCreateGist();
+    const g = await api('/gists/' + cfg.gistId);
+    const f = g.files[DATA_FILE];
+    const text = f ? (f.truncated ? await (await fetch(f.raw_url)).text() : f.content) : '';
+    let remote = {};
+    try { remote = (JSON.parse(text || '{}').items) || {}; } catch {}
+    let pulled = false, needPush = FEEDS.some(([, file]) => !g.files[file]);
+    for (const [id, r] of Object.entries(remote)) {
+      const l = state.items[id];
+      if (!l || r.updatedAt > l.updatedAt) { state.items[id] = r; pulled = true; }
+    }
+    for (const [id, l] of Object.entries(state.items)) {
+      const r = remote[id];
+      if (!r || l.updatedAt > r.updatedAt) needPush = true;
+    }
+    if (pulled) { persist(); render(); }
+    if (needPush) await api('/gists/' + cfg.gistId, {method:'PATCH', body: JSON.stringify({files: filesPayload()})});
+    setStatus('Synced ' + new Date().toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'}));
+  } catch (err) {
+    if (err.status === 404) { cfg.gistId = ''; saveCfg(); }
+    setStatus(err.status === 401 ? 'Token rejected' : navigator.onLine ? 'Sync error' : 'Offline');
+  } finally {
+    syncing = false;
+    if (syncAgain) { syncAgain = false; sync(); }
+  }
+}
+
+/* ---------- settings ---------- */
+function renderSettings() {
+  const connected = cfg.token && cfg.gistId;
+  const base = connected ? `gist.githubusercontent.com/${cfg.login}/${cfg.gistId}/raw/` : '';
+  const notif = 'Notification' in window ? Notification.permission : 'unsupported';
+  $('#setBody').innerHTML = `
+    <h3 style="margin:0;font-size:15px">Sync between devices</h3>
+    ${cfg.token ? `
+      <p class="help">${connected ? `Connected as <b>${esc(cfg.login)}</b>. Data lives in a secret gist on your GitHub account.` : 'Token saved. Not connected yet.'}</p>
+      <div class="row"><button class="ghost" id="sNow">Sync now</button><button class="ghost danger" id="sOff">Disconnect this device</button></div>` : `
+      <p class="help">Tasks stay on this device until you connect GitHub. Create a token with only the <b>gist</b> permission
+        (<a href="https://github.com/settings/tokens/new?scopes=gist&description=Tracker%20sync" target="_blank" rel="noopener">open the GitHub token page</a>),
+        then paste it here. Use the same token on your Mac and your phone.</p>
+      <div class="row"><input type="password" id="sToken" placeholder="GitHub token" autocomplete="off" style="flex:1"><button class="primary" id="sConnect">Connect</button></div>`}
+    <hr>
+    <h3 style="margin:0;font-size:15px">Reminders in Apple Calendar</h3>
+    ${connected ? `
+      <p class="help">Subscribe once per category so each one gets its own color. In the subscribe window choose the iCloud location
+        (so your phone gets it too), turn off “Remove Alerts”, and set auto-refresh to every 5 minutes.</p>
+      ${FEEDS.map(([cat, file, label]) => `<div class="feed" style="--c:${cat ? CATS[cat].color : 'var(--muted)'}"><i></i><span>${label}</span>
+        <a href="webcal://${base}${file}">Subscribe</a><button class="ghost" data-copy="https://${base}${file}">Copy link</button></div>`).join('')}`
+      : '<p class="help">Connect sync first. The app then publishes calendar feeds that Apple Calendar subscribes to, and Calendar fires the alerts even when this app is closed.</p>'}
+    <hr>
+    <h3 style="margin:0;font-size:15px">Alerts while this app is open</h3>
+    <p class="help">${notif === 'granted' ? 'Browser notifications are on for this device.' : notif === 'denied' ? 'Notifications are blocked for this site in your browser settings.'
+      : notif === 'unsupported' ? 'This browser does not support notifications here. On iPhone, add the app to your Home Screen first.' : 'Optional extra alerts from the browser.'}</p>
+    ${notif === 'default' ? '<div><button class="ghost" id="sNotif">Turn on browser notifications</button></div>' : ''}
+    <hr>
+    <div><button class="ghost" id="sExport">Download a backup (.json)</button></div>`;
+}
+$('#syncBtn').onclick = () => { renderSettings(); $('#settings').showModal(); };
+$('#setClose').onclick = () => $('#settings').close();
+$('#setBody').addEventListener('click', async e => {
+  const t = e.target;
+  if (t.id === 'sConnect') {
+    const tok = $('#sToken').value.trim();
+    if (!tok) return;
+    cfg = {token: tok}; saveCfg();
+    await sync(); renderSettings();
+  } else if (t.id === 'sNow') { await sync(); renderSettings(); }
+  else if (t.id === 'sOff') {
+    if (confirm('Disconnect sync on this device? Your tasks stay here and in the gist.')) { cfg = {}; saveCfg(); setStatus('Local only'); renderSettings(); }
+  } else if (t.id === 'sNotif') { await Notification.requestPermission(); renderSettings(); }
+  else if (t.id === 'sExport') {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], {type:'application/json'}));
+    a.download = `tracker-backup-${today()}.json`; a.click(); URL.revokeObjectURL(a.href);
+  } else if (t.dataset.copy) {
+    await navigator.clipboard.writeText(t.dataset.copy); t.textContent = 'Copied';
+  }
+});
+
+/* ---------- in-app reminders (only while the app is open) ---------- */
+function checkReminders() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const seen = readJSON(LS_SEEN, {}), now = Date.now();
+  for (const it of Object.values(state.items)) {
+    if (it.deleted || !it.date || !it.remind || it.remind === 'none' || (it.kind === 'task' && it.status === 'done')) continue;
+    const base = new Date(`${it.date}T${it.time || '09:00'}`).getTime();
+    const at = base - (it.time ? REMIND_MS[it.remind] : (REMIND_MS[it.remind] >= 864e5 ? REMIND_MS[it.remind] : 0));
+    const key = it.id + ':' + at;
+    if (at <= now && now - at < 3e5 && !seen[key]) {
+      seen[key] = 1;
+      new Notification((it.kind === 'task' ? 'Due: ' : '') + it.title, {body: `${(CATS[it.cat] || CATS.personal).name} · ${fmtWhen(it)}`, icon:'icon.png'});
+    }
+  }
+  localStorage.setItem(LS_SEEN, JSON.stringify(seen));
+}
+
+/* ---------- start ---------- */
+render();
+sync();
+setInterval(checkReminders, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { sync(); render(); } });
+window.addEventListener('online', sync);
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
