@@ -274,18 +274,21 @@ function renderTasks() {
   const tasks = all.filter(t => !t.daily);
   const byDue = (a, b) => (a.date || '9999') .localeCompare(b.date || '9999') || (a.time || '99').localeCompare(b.time || '99') || a.createdAt - b.createdAt;
   const open = tasks.filter(t => t.status !== 'done').sort(byDue);
+  const withDate = open.filter(t => t.date), noDate = open.filter(t => !t.date);
+  const sect = (name, list, note) => list.length ? `<div class="sect">${name}<span>${note}</span></div><ul>${list.map(name === 'Daily' ? dailyCard : taskCard).join('')}</ul>` : '';
   const done = tasks.filter(t => t.status === 'done').sort((a, b) => b.updatedAt - a.updatedAt);
   $('#main').innerHTML = `
     <form class="panel quick" id="quick">
       <input type="text" id="qTitle" placeholder="Add a task…" aria-label="Task title" autocomplete="off">
       <select id="qCat" aria-label="Category">${catOptions(filter === 'all' ? 'personal' : filter)}</select>
-      <select id="qRepeat" aria-label="Repeats"><option value="once">One-time</option><option value="daily">Daily</option></select>
-      <input type="date" id="qDate" aria-label="Deadline (optional)" title="Deadline (optional)">
+      <select id="qType" aria-label="Task type"><option value="none">No deadline</option><option value="date">With deadline</option><option value="daily">Daily</option></select>
+      <input type="date" id="qDate" aria-label="Deadline" title="Deadline" hidden>
       <button class="primary">Add</button>
     </form>
-    ${daily.length ? `<div class="sect">Daily<span>${daily.filter(t => doneOn(t, today())).length} of ${daily.length} done today</span></div>
-      <ul>${daily.map(dailyCard).join('')}</ul><div class="sect">Tasks</div>` : ''}
-    ${open.length ? `<ul>${open.map(taskCard).join('')}</ul>` : `<div class="empty">No open tasks${filter === 'all' ? '' : ' in ' + CATS[filter].name}. Add one above.</div>`}
+    ${sect('Daily', daily, `${daily.filter(t => doneOn(t, today())).length} of ${daily.length} done today`)}
+    ${sect('With deadline', withDate, `${withDate.length} open`)}
+    ${sect('No deadline', noDate, `${noDate.length} open`)}
+    ${daily.length || open.length ? '' : `<div class="empty">No open tasks${filter === 'all' ? '' : ' in ' + CATS[filter].name}. Add one above.</div>`}
     ${done.length ? `<details class="donelist"><summary>Completed (${done.length})</summary><ul>${done.map(taskCard).join('')}</ul></details>` : ''}`;
 }
 function dated() { return live().filter(i => i.date); }
@@ -339,7 +342,7 @@ function renderEditor() {
     <label class="f">Title<input id="eTitle" value="${esc(it.title)}" placeholder="${isTask ? 'What needs doing?' : 'What is happening?'}" autocomplete="off"></label>
     <div class="row">
       <label class="f">Category<select id="eCat">${catOptions(it.cat)}</select></label>
-      ${isTask ? `<label class="f">Repeats<select id="eRepeat"><option value="once">One-time</option><option value="daily" ${daily ? 'selected' : ''}>Daily</option></select></label>` : ''}
+      ${isTask ? `<label class="f">Repeats<select id="eRepeat"><option value="once">One-time (deadline optional)</option><option value="daily" ${daily ? 'selected' : ''}>Daily</option></select></label>` : ''}
       ${isTask && !daily ? `<label class="f">Status<select id="eStatus">${opts(STATUS, it.status)}</select></label>` : ''}
     </div>
     ${daily ? `<p class="help">Resets every day and has no deadline, so it stays off the calendar. Done on ${lastDays(30).filter(d => doneOn(it, d)).length} of the last 30 days; current streak ${streak(it)}.</p>` : `
@@ -428,9 +431,13 @@ $('#main').addEventListener('submit', e => {
   e.preventDefault();
   const title = $('#qTitle').value.trim();
   if (!title) return;
-  const daily = $('#qRepeat').value === 'daily';
-  create('task', {title, cat: $('#qCat').value, daily, date: daily ? '' : $('#qDate').value});
+  const type = $('#qType').value;
+  create('task', {title, cat: $('#qCat').value, daily: type === 'daily', date: type === 'date' ? $('#qDate').value : ''});
+  if (type !== 'none') { $('#qType').value = type; $('#qDate').hidden = type !== 'date'; }
   $('#qTitle').focus();
+});
+$('#main').addEventListener('change', e => {
+  if (e.target.id === 'qType') { $('#qDate').hidden = e.target.value !== 'date'; if (!$('#qDate').hidden) $('#qDate').focus(); }
 });
 $('#main').addEventListener('click', e => {
   const t = e.target;
